@@ -15,12 +15,13 @@
 #define _DIST_MAX 410 //[0711] 측정 최댓값
 
 // Distance sensor
-#define _DIST_ALPHA 0.5 // [3095] ema필터의 alpha 값을 설정
+#define DELAY_MICROS  1500 // 필터에 넣을 샘플값을 측정하는 딜레이(고정값!)
+#define _DIST_ALPHA 0.35 // [3095] ema필터의 alpha 값을 설정
 
 // Servo range
-#define _DUTY_MIN 1100   // [1615] 서보 제어 펄스 폭: 최고 각도
-#define _DUTY_NEU 1350  // [1615] 서보 제어 펄스 폭: 수평
-#define _DUTY_MAX 1650  // [1615] 서보 제어 펄스 폭: 최저 각도
+#define _DUTY_MIN 1200   // [1615] 서보 제어 펄스 폭: 최고 각도
+#define _DUTY_NEU 1470  // [1615] 서보 제어 펄스 폭: 수평
+#define _DUTY_MAX 1800  // [1615] 서보 제어 펄스 폭: 최저 각도
 
 // Servo speed control
 #define _SERVO_ANGLE 30 
@@ -43,7 +44,10 @@ Servo myservo;
 
 // Distance sensor
 float dist_target; // location to send the ball
-float dist_raw, dist_ema;  // [1615] 센서가 인식한 거리/ema 필터링된 거리
+float dist_raw;  // [1615] 센서가 인식한 거리
+float dist_ema = 0;            // EMA 필터에 사용할 변수
+const float coE[] = {-0.0000165, 0.0095250, -0.3398124, 86.4270318};
+float samples_num = 3;     // 스파이크 제거를 위한 부분필터에 샘플을 몇개 측정할 것인지.
 
 // Event periods
 unsigned long last_sampling_time_dist, last_sampling_time_servo, last_sampling_time_serial; 
@@ -55,9 +59,6 @@ int duty_target, duty_curr;
 
 // PID variables
 float error_curr, error_prev, control, pterm, dterm, iterm;
-
-// global variables
-const float coE[] = {0.0000046, -0.0040207, 1.8754280, -15.0899137};
 
 void setup() {
   // initialize GPIO pins for LED and attach servo 
@@ -117,8 +118,8 @@ void loop() {
     control = pterm + iterm + dterm;
 
     // duty_target = f(duty_neutral, control)
-    if (control > 0)  duty_target = _DUTY_NEU + 3.3 * control;
-    else duty_target = _DUTY_NEU + 2.3 * control;
+    if (control > 0)  duty_target = _DUTY_NEU + 2.49 * control;
+    else duty_target = _DUTY_NEU + 3.04 * control;
 
     // keep duty_target value within the range of [_DUTY_MIN, _DUTY_MAX]
     duty_target = min(max(duty_target, _DUTY_MIN), _DUTY_MAX); // [1615]
@@ -166,12 +167,29 @@ float ir_distance(void){ // return value unit: mm
   return val;
 }
 
+float under_noise_filter(void){ // 아래로 떨어지는 형태의 스파이크를 제거해주는 필터
+  int currReading;
+  int largestReading = 0;
+  for (int i = 0; i < samples_num; i++) {
+    currReading = ir_distance();
+    if (currReading > largestReading) { largestReading = currReading; }
+    // Delay a short time before taking another reading
+    delayMicroseconds(DELAY_MICROS);
+  }
+  return largestReading;
+}
+
 float ir_distance_filtered(void){ // return value unit: mm
-  static float val = 0; // [3088]
-  static float dist_ema = 0; // [3088]
-  float raw = ir_distance(); // [3088]
-  if (raw >= _DIST_MIN && raw <= _DIST_MAX) // [3088]
-    val = raw; // [3088]
-  dist_ema = _DIST_ALPHA * val + (1.0 - _DIST_ALPHA) * dist_ema; // [3088]
-  return dist_ema; // [3088]
+  // under_noise_filter를 통과한 값을 upper_nosie_filter에 넣어 최종 값이 나옴.
+  int currReading;
+  int lowestReading = 1024;
+  for (int i = 0; i < samples_num; i++) {
+    currReading = under_noise_filter();
+    if (currReading < lowestReading) { lowestReading = currReading; }
+  }
+//    if (lowestReading <= _DIST_MIN) lowestReading = _DIST_MIN;
+//    if (lowestReading >= _DIST_MAX) lowestReading = _DIST_MAX;
+  // ema 필터 추가
+  dist_ema = _DIST_ALPHA*lowestReading + (1-_DIST_ALPHA)*dist_ema;
+  return dist_ema;
 }
