@@ -33,7 +33,7 @@
 #define _INTERVAL_SERIAL 100 // [3078] Serial제어주기 (ms)
 
 // PID parameters
-#define _KP 2.0 
+#define _KP 1.7 
 #define _KD 70.0 
 
 //////////////////////
@@ -116,10 +116,8 @@ void loop() {
     error_curr = _DIST_TARGET - dist_raw; // [3073] 현재 읽어들인 데이터와 기준 값의 차이
     pterm = _KP * error_curr; // [3073] p게인 값인 kp와 error 값의 곱
     iterm = 0;
-    //if (error_curr > -1 && error_curr < 1) dterm = 0.65 * _KD * (error_curr - error_prev);
-    //else if (error_curr > -2 && error_curr < 2) dterm = 0.75 * _KD * (error_curr - error_prev);
-    //else if (error_curr > -3 && error_curr < 3) dterm = 0.85 * _KD * (error_curr - error_prev);
-    if (error_curr > -3 && error_curr < 3) dterm = (0.7 + error_curr) * _KD * (error_curr - error_prev);
+    if (error_curr > 0 && error_curr < 3) dterm = (0.7 + 0.1 * error_curr) * _KD * (error_curr - error_prev);
+    else if (error_curr > -3 && error_curr <= 0) dterm = -(0.8 + 0.1 * error_curr) * _KD * (error_curr - error_prev);
     else dterm = _KD * (error_curr - error_prev);
     // control = pterm + iterm + dterm;
     control = pterm + dterm;
