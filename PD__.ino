@@ -16,7 +16,7 @@
 
 // Distance sensor
 #define DELAY_MICROS  1500 // 필터에 넣을 샘플값을 측정하는 딜레이(고정값!)
-#define _DIST_ALPHA 0.35 // [3095] ema필터의 alpha 값을 설정
+#define _DIST_ALPHA 0.23 // [3095] ema필터의 alpha 값을 설정
 
 // Servo range
 #define _DUTY_MIN 1200   // [1615] 서보 제어 펄스 폭: 최고 각도
@@ -33,8 +33,8 @@
 #define _INTERVAL_SERIAL 100 // [3078] Serial제어주기 (ms)
 
 // PID parameters
-#define _KP 2.5 
-#define _KD 75.0 
+#define _KP 2.0 
+#define _KD 70.0 
 
 //////////////////////
 // global variables //
@@ -116,7 +116,11 @@ void loop() {
     error_curr = _DIST_TARGET - dist_raw; // [3073] 현재 읽어들인 데이터와 기준 값의 차이
     pterm = _KP * error_curr; // [3073] p게인 값인 kp와 error 값의 곱
     iterm = 0;
-    dterm = _KD * (error_curr - error_prev);
+    //if (error_curr > -1 && error_curr < 1) dterm = 0.65 * _KD * (error_curr - error_prev);
+    //else if (error_curr > -2 && error_curr < 2) dterm = 0.75 * _KD * (error_curr - error_prev);
+    //else if (error_curr > -3 && error_curr < 3) dterm = 0.85 * _KD * (error_curr - error_prev);
+    if (error_curr > -3 && error_curr < 3) dterm = (0.7 + error_curr) * _KD * (error_curr - error_prev);
+    else dterm = _KD * (error_curr - error_prev);
     // control = pterm + iterm + dterm;
     control = pterm + dterm;
 
